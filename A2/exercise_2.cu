@@ -1,9 +1,8 @@
 #include<stdio.h>
 #include <sys/time.h>
-#define N 1<<17
+#include <stdlib.h> 
 #define margin 1e-6
-
-
+int N;
 
 double cpuSecond() {
    struct timeval tp;
@@ -18,8 +17,9 @@ __global__ void SAXPY (float* x,float* y,float* a){
         y[id]+=*a+x[id];
 }
 
-int main(){   
+int main(int argc, char* argv[]){   
     float* x,*y,a,*r;
+    N=atoi(argv[1]);
     uint gridsize=(N+256-1)/256;
     uint nBytes=sizeof(float)*N;
     x=(float*)malloc(nBytes);
