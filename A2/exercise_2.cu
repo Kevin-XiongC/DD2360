@@ -1,66 +1,74 @@
-#include<stdio.h>
+#include <stdio.h>
 #include <sys/time.h>
-#include <stdlib.h> 
-#define margin 1e-6
-int N;
+#include <stdlib.h>
+
+#define MARGIN 1e-6
+#define ARRAY_SIZE 100000
 
 double cpuSecond() {
    struct timeval tp;
-   gettimeofday(&tp,NULL);
-   return ((double)tp.tv_sec + (double)tp.tv_usec*1.e-6);
+   gettimeofday(&tp, NULL);
+   return ((double)tp.tv_sec + (double)tp.tv_usec * 1.e-6);
 }
 
-__global__ void SAXPY (float* x,float* y,float* a){
-//AX+Y
-    int id =blockIdx.x*blockDim.x+threadIdx.x;
-    if(id<N)
-        y[id]+=*a+x[id];
+__global__ void SAXPY (double *x,double *y, double a) {
+    // Y = AX + Y
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+    for (int i = index; i < ARRAY_SIZE; i += stride)
+        y[i] += a * x[i];
 }
 
-int main(int argc, char* argv[]){   
-    float* x,*y,a,*r;
-    N=atoi(argv[1]);
-    uint gridsize=(N+256-1)/256;
-    uint nBytes=sizeof(float)*N;
-    x=(float*)malloc(nBytes);
-    y=(float*)malloc(nBytes);
-    r=(float*)malloc(nBytes);
-    for(int i=0;i<N;i++)
-    {
-        x[i]=i;
-        y[i]=2*i;
+int main(int argc, char *argv[]) {   
+    double *x, *y, a = 2.2, *r;
+    unsigned int gridsize = (ARRAY_SIZE + 256 - 1) / 256;
+    unsigned int nBytes = sizeof(double) * ARRAY_SIZE;
+    x = (double*)malloc(nBytes);
+    y = (double*)malloc(nBytes);
+    r = (double*)malloc(nBytes);
+    for (int i = 0; i < ARRAY_SIZE; i++) {
+        x[i] = i;
+        y[i] = 2 * i;
     }
-    a=1.1;
 
-    float *d_x, *d_y, *d_a;
-    cudaMalloc((void**)&d_x, nBytes);
-    cudaMalloc((void**)&d_y, nBytes);
-    cudaMalloc((void**)&d_a, sizeof(float));
-    cudaMemcpy((void*)d_x, (void*)x, nBytes, cudaMemcpyHostToDevice);
-    cudaMemcpy((void*)d_y, (void*)y, nBytes, cudaMemcpyHostToDevice);
-    cudaMemcpy((void*)d_a, (void*)&a, sizeof(float), cudaMemcpyHostToDevice);
+    double *d_x, *d_y;
+    cudaMalloc(&d_x, nBytes);
+    cudaMalloc(&d_y, nBytes);
+    cudaMemcpy(d_x, x, nBytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_y, y, nBytes, cudaMemcpyHostToDevice);
 
+    printf("Computing SAXPY on the CPU...\n");
     double start = cpuSecond();
-    for(int i=0;i<N;i++)
-    {
-        y[i]+=a*x[i];
-        r[i]=y[i];
+    for (int i = 0; i < ARRAY_SIZE; i++) {
+        y[i] += a * x[i];
+        r[i] = y[i];
     }
-    printf("CPU costs %lf\n",cpuSecond()-start);
+    printf("Done! CPU costs %lf\n", cpuSecond() - start);
 
-    start=cpuSecond();
-    SAXPY<<<gridsize,256>>>(d_x, d_y, d_a);
+    printf("Computing SAXPY on the GPU...\n");
+    start = cpuSecond();
+    SAXPY<<<gridsize,256>>>(d_x, d_y, a);
     cudaDeviceSynchronize();
-    printf("GPU costs %lf\n",cpuSecond()-start);
-    cudaMemcpy((void*)y, (void*)d_y, nBytes, cudaMemcpyDeviceToHost);
+    printf("Done! GPU costs %lf\n", cpuSecond() - start);
 
-    int c=0;
-    for(int i=0;i<N;i++)
-        c+=abs(y[i]-r[i])>margin?1:0;
-    printf("%d mismatches\n");
-      
-    cudaFree(d_a);
+    printf("Comparing the output for each implementation...\n");
+    cudaMemcpy(y, d_y, nBytes, cudaMemcpyDeviceToHost);
+    int c = 0;
+    for(int i = 0; i < ARRAY_SIZE; i++) {
+        double diff = abs(y[i] - r[i]);
+        if (diff > MARGIN) {
+            c += 1;
+            printf("The %d-th element doesn't match. The difference is %lf\n", i, diff);
+        }
+    }
+    printf("Totally %d mismatch(es)\n", c);
+    if (c == 0)
+        printf("Correct!\n");
+
     cudaFree(d_x);
     cudaFree(d_y);
+    free(x);
+    free(y);
+    free(r);
     return 0;
 }
