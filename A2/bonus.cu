@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
     int *g_count;
     double gpu_start = cpuSecond();
     cudaMallocManaged(&g_count, sizeof(int) * num_threads);
-    pi_seq<<<1, num_threads>>>(g_count, dev_random);
+    pi_seq<<<num_block, num_threads>>>(g_count, dev_random);
     cudaDeviceSynchronize();
     
     int g_sum = 0;
