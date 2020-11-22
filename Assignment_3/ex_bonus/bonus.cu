@@ -133,6 +133,8 @@ void shared_sgemm_kernel(float *C, float *A, float *B, long size)
 	float val = 0.0;
 
 	/* TODO declare shared memory with size TILE_SIZE x TILE_SIZE */
+	__shared__ float tile_A[TILE_SIZE][TILE_SIZE];
+	__shared__ float tile_B[TILE_SIZE][TILE_SIZE];
 
 	if (col < size && row < size) {
 		const long local_col = blockIdx.x * TILE_SIZE + threadIdx.x;
@@ -144,8 +146,10 @@ void shared_sgemm_kernel(float *C, float *A, float *B, long size)
 			__syncthreads();
 	
 			/* TODO introduce a pragma directive that can potentially improve performance here */
+			#pragma loop(hint_parallel(TILE_SIZE))
 			for (long k = 0; k < TILE_SIZE; ++k) {
 				/* TODO Perform multiplication here */
+				val += tile_A[threadIdx.y][k] * tile_B[k][threadIdx.x];
 			}
 			__syncthreads();
 		}
@@ -179,7 +183,7 @@ void cublas_sgemm(float *C, float *A, float *B, long size)
 
 	gettimeofday(&t0, NULL);
 	/* TODO fill in the blanks, do C = BA instead of C = AB */
-	cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, , , , , , , , , , , );
+	cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, size, size, size, &alpha, B, size, A, size, &beta, C, size);
 	checkCudaErrors(cudaDeviceSynchronize());
 	gettimeofday(&t1, NULL);
 	cublasDestroy(handle);
