@@ -1,3 +1,4 @@
+s = r'''
 // Template file for the OpenCL Assignment 4
 
 #include <stdio.h>
@@ -10,11 +11,17 @@
 // A errorCode to string converter (forward declaration)
 const char *clGetErrorString(int);
 
+//TODO: Write your kernel here
+const char *mykernel = " \
+__kernel \
+void HelloWorld () { \
+  int index = get_global_id(0); \
+  printf(\"Hello World! My threadId is %d\\n\", index); \
+} \
+";
 
-const char *mykernel = ""; //TODO: Write your kernel here
 
-
-int main(int argc, char *argv) {
+int main(int argc, char **argv) {
   cl_platform_id *platforms; cl_uint n_platform;
 
   // Find OpenCL Platforms
@@ -35,6 +42,24 @@ int main(int argc, char *argv) {
   cl_command_queue cmd_queue = clCreateCommandQueue(context, device_list[0], 0, &err); CHK_ERROR(err); 
 
   /* Insert your own code here */
+  cl_program program = clCreateProgramWithSource(context, 1, (const char **)&mykernel, NULL, &err);
+  err = clBuildProgram(program, 1, device_list, NULL, NULL, NULL);
+  if (err != CL_SUCCESS) {
+    size_t len;
+    char buffer[2048];
+    clGetProgramBuildInfo(program, device_list[0], CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
+    fprintf(stderr, "Build error: %s\n", buffer);
+    return 0;
+  }
+
+  cl_kernel kernel = clCreateKernel(program, "HelloWorld", &err); CHK_ERROR(err);
+
+  size_t n_workitem = 256;
+  size_t workgroup_size = 256;
+  err = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, NULL, &n_workitem, &workgroup_size, 0, NULL, NULL); CHK_ERROR(err);
+
+  err = clFlush(cmd_queue); CHK_ERROR(err);
+  err = clFinish(cmd_queue); CHK_ERROR(err);
   
   // Finally, release all that we have allocated.
   err = clReleaseCommandQueue(cmd_queue); CHK_ERROR(err);
@@ -142,3 +167,9 @@ const char *clGetErrorString(int errorCode) {
     default: return "CL_UNKNOWN_ERROR";
   }
 }
+'''
+
+with open("ex_1.cu", 'w') as f:
+  f.write(s)
+
+!nvcc -arch=sm_30 ex_1.cu -o ex_1.out -lOpenCL
