@@ -10,9 +10,9 @@
 #define MARGIN (1e-6)
 
 double cpuSecond() {
-   struct timeval tp;
-   gettimeofday(&tp, NULL);
-   return ((double)tp.tv_sec + (double)tp.tv_usec * 1.e-6);
+  struct timeval tp;
+  gettimeofday(&tp, NULL);
+  return ((double)tp.tv_sec + (double)tp.tv_usec * 1.e-6);
 }
 
 // This is a macro for checking the error variable.
