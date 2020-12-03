@@ -1,4 +1,3 @@
-s = r'''
 // Template file for the OpenCL Assignment 4
 
 #include <stdio.h>
@@ -15,8 +14,16 @@ const char *clGetErrorString(int);
 const char *mykernel = " \
 __kernel \
 void HelloWorld () { \
-  int index = get_global_id(0); \
-  printf(\"Hello World! My threadId is %d\\n\", index); \
+  int group_id_x = get_group_id(0); \
+  int group_id_y = get_group_id(1); \
+  int group_id_z = get_group_id(2); \
+  int local_id_x = get_local_id(0); \
+  int local_id_y = get_local_id(1); \
+  int local_id_z = get_local_id(2); \
+  int global_id_x = get_global_id(0); \
+  int global_id_y = get_global_id(1); \
+  int global_id_z = get_global_id(2); \
+  printf(\"Hello World! My group id is (%d, %d, %d), local id is (%d, %d, %d), global id is(%d, %d, %d)\\n\", group_id_x, group_id_y, group_id_z, local_id_x, local_id_y, local_id_z, global_id_x, global_id_y, global_id_z); \
 } \
 ";
 
@@ -54,9 +61,9 @@ int main(int argc, char **argv) {
 
   cl_kernel kernel = clCreateKernel(program, "HelloWorld", &err); CHK_ERROR(err);
 
-  size_t n_workitem = 256;
-  size_t workgroup_size = 256;
-  err = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, NULL, &n_workitem, &workgroup_size, 0, NULL, NULL); CHK_ERROR(err);
+  size_t n_workitem[3] = {4, 8, 8};
+  size_t workgroup_size[3] = {2, 4, 4};
+  err = clEnqueueNDRangeKernel(cmd_queue, kernel, 3, NULL, n_workitem, workgroup_size, 0, NULL, NULL); CHK_ERROR(err);
 
   err = clFlush(cmd_queue); CHK_ERROR(err);
   err = clFinish(cmd_queue); CHK_ERROR(err);
@@ -167,9 +174,3 @@ const char *clGetErrorString(int errorCode) {
     default: return "CL_UNKNOWN_ERROR";
   }
 }
-'''
-
-with open("ex_1.cu", 'w') as f:
-  f.write(s)
-
-!nvcc -arch=sm_30 ex_1.cu -o ex_1.out -lOpenCL
