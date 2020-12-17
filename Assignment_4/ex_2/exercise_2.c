@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <CL/cl.h>
 #include <sys/time.h>
+#include <math.h>
 
 #define ARRAY_SIZE (200000)
 #define BLOCK_SIZE (256)
@@ -93,8 +94,8 @@ int main(int argc, char **argv) {
   err = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&y_dev); CHK_ERROR(err);
   err = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *)&a_dev); CHK_ERROR(err);
 
-  size_t workgroup_size = (ARRAY_SIZE + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  size_t n_workitem = workgroup_size * BLOCK_SIZE;
+  size_t workgroup_size = BLOCK_SIZE;
+  size_t n_workitem = (int)(ARRAY_SIZE / BLOCK_SIZE + 1) * BLOCK_SIZE;
   printf("Computing SAXPY on the GPU...\n");
   start = cpuSecond();
   err = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, NULL, &n_workitem, &workgroup_size, 0, NULL, NULL); CHK_ERROR(err);
