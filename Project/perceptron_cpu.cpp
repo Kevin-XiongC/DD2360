@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <random>
 #include <stdlib.h>
@@ -10,6 +11,7 @@ using namespace std;
 #define DIM_INPUT (3072)
 #define DIM_OUTPUT (10)
 #define NUM_TRAINING (5000)
+#define NUM_VALIDATION (2000)
 #define NUM_TEST (1000)
 
 #define BATCH_SIZE (100)
@@ -196,13 +198,10 @@ void batchGradientDescent(double *x, int *y, double *w, double *b, double *x_t, 
     // @param y: of size (N, 1), that is (NUM, 1)
     // @param w: of size (3072, 10), that is (DIM_INPUT, DIM_OUTPUT)
     // @param b: of size (10, 1), that is (DIM_OUTPUT, 1)
+    ofstream outfile;
+    outfile.open("plots/perceptron_cpu.txt");
+    
     for (int epoch = 0; epoch < EPOCHS; epoch++) {
-        // compute cost
-        double cost = computeCost(x, y, w, b, NUM_TRAINING);
-        // compute accuracy
-        double acc = computeAccuracy(x, y, w, b, NUM_TRAINING);
-        printf("Epoch %d: cost = %lf accuracy = %lf \n", epoch, cost, acc);
-
         for (int n_batch = 0; n_batch < NUM_TRAINING / BATCH_SIZE; n_batch++) {
             int start = n_batch * BATCH_SIZE;
             double *batch_x = x + start * DIM_INPUT;
@@ -221,7 +220,14 @@ void batchGradientDescent(double *x, int *y, double *w, double *b, double *x_t, 
             }
             free(gradient);
         }
+        // compute cost on training and validation set
+        double cost_training = computeCost(x, y, w, b, NUM_TRAINING);
+        double cost_validation = computeCost(x_t, y_t, w, b, NUM_VALIDATION);
+        printf("Epoch %d: cost_training = %lf cost_validation = %lf \n", epoch, cost_training, cost_validation);
+        outfile << epoch << " " << cost_training << " " << cost_validation << endl;
     }
+
+    outfile.close();
 }
 
 
@@ -229,12 +235,16 @@ class Data {
 public:
     double *training_images;    // N * 3072
     int *training_labels;    // N
+    double *validation_images;
+    int *validation_labels;
     double *test_images;
     int *test_labels;
 
     Data() {
         this->training_images = (double *)calloc(NUM_TRAINING * DIM_INPUT, sizeof(double));
         this->training_labels = (int *)calloc(NUM_TRAINING, sizeof(int));
+        this->validation_images = (double *)calloc(NUM_VALIDATION * DIM_INPUT, sizeof(double));
+        this->validation_labels = (int *)calloc(NUM_VALIDATION, sizeof(int));
         this->test_images = (double *)calloc(NUM_TEST * DIM_INPUT, sizeof(double));
         this->test_labels = (int *)calloc(NUM_TEST, sizeof(int));
     }
@@ -242,6 +252,8 @@ public:
     ~Data() {
         free(this->training_images);
         free(this->training_labels);
+        free(this->validation_images);
+        free(this->validation_labels);
         free(this->test_images);
         free(this->test_labels);
     }
@@ -255,6 +267,13 @@ public:
             }
             this->training_labels[i] = cifar.training_labels[i];
         }
+        for (int i = 0; i < NUM_VALIDATION; i++) {
+            auto image = cifar.training_images[i + NUM_TRAINING];
+            for (int j = 0; j < DIM_INPUT; j++) {
+                this->validation_images[i * DIM_INPUT + j] = image[j];
+            }
+            this->validation_labels[i] = cifar.training_labels[i + NUM_TRAINING];
+        }
         for (int i = 0; i < NUM_TEST; i++) {
             auto image = cifar.test_images[i];
             for (int j = 0; j < DIM_INPUT; j++) {
@@ -266,6 +285,7 @@ public:
 
     void normalize() {
         ::normalize(this->training_images, NUM_TRAINING);
+        ::normalize(this->validation_images, NUM_VALIDATION);
         ::normalize(this->test_images, NUM_TEST);
     }
 
@@ -278,7 +298,7 @@ public:
 };
 
 int main() {
-    auto cifar = cifar::read_dataset<vector, vector, uint8_t, uint8_t>(NUM_TRAINING, NUM_TEST);
+    auto cifar = cifar::read_dataset<vector, vector, uint8_t, uint8_t>(NUM_TRAINING + NUM_VALIDATION, NUM_TEST);
     Data data;
     data = cifar;
     
@@ -291,5 +311,11 @@ int main() {
     double *b = (double *)calloc(DIM_OUTPUT, sizeof(double));
     initialize(w, b, mu, sigma);
 
-    batchGradientDescent(data.training_images, data.training_labels, w, b, data.test_images, data.test_labels);
+    batchGradientDescent(data.training_images, data.training_labels, w, b, data.validation_images, data.validation_labels);
+
+    // accuracy on test set
+    double accuracy = computeAccuracy(data.test_images, data.test_labels, w, b, NUM_TEST);
+    cout << "Accuracy on test set: " << accuracy << endl;
+
+    return 0;
 }
