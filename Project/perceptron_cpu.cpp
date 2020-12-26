@@ -60,15 +60,18 @@ void initialize(double *w, double *b, const double mu, const double sigma) {
         b[i] = distribution(generator);
 }
 
-double *dot(double *a, double *b, const int n, const int m, const int p) {
+double *dot(double *a, double *b, const int n, const int m, const int p, const bool transpose) {
     // @param a: of size (n, m)
     // @param b: of size (m, p)
+    // @param transpose: if transpose matrix a
     // @return: dot(a, b), of size (n, p)
     double *ab = (double *)calloc(n * p, sizeof(double));
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < p; j++) {
-            for (int k = 0; k < m; k++)
-                ab[i * p + j] += a[i * m + k] * b[k * p + j];
+            for (int k = 0; k < m; k++) {
+                if (transpose) ab[i * p + j] += a[k * n + i] * b[k * p + j];
+                else ab[i * p + j] += a[i * m + k] * b[k * p + j];
+            }
         }
     }
     return ab;
@@ -104,7 +107,7 @@ double *evaluate(double *x, double *w, double *b, const int N) {
     // @param w: of size (3072, 10), that is (DIM_INPUT, DIM_OUTPUT)
     // @param b: of size (10, 1), that is (DIM_OUTPUT, 1)
     // @return: softmax(dot(x, w) + b), of size (N, 10)
-    double *wx = dot(x, w, N, DIM_INPUT, DIM_OUTPUT);
+    double *wx = dot(x, w, N, DIM_INPUT, DIM_OUTPUT, false);
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < DIM_OUTPUT; j++)
             wx[i * DIM_OUTPUT + j] += b[j];
@@ -174,15 +177,13 @@ void computeGradient(double *x, int *y, double *w, double *b, const int N, Gradi
         }
     }
 
-    double *xT = transpose(x, N, DIM_INPUT);    // of size (3072, N)
-    gradient->grad_W = dot(xT, p, DIM_INPUT, N, DIM_OUTPUT);
+    gradient->grad_W = dot(x, p, DIM_INPUT, N, DIM_OUTPUT, true);
     for (int i = 0; i < DIM_INPUT; i++) {
         for (int j = 0; j < DIM_OUTPUT; j++) {
             int index = i * DIM_OUTPUT + j;
             gradient->grad_W[index] = gradient->grad_W[index] / N + 2 * LAMBDA * w[index];
         }
     }
-    free(xT);
 
     gradient->grad_b = (double *)calloc(DIM_OUTPUT, sizeof(double));
     for (int i = 0; i < N; i++) {

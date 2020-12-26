@@ -1,3 +1,9 @@
 .DS_Store
 .vscode/
+
 Project/*.out
+Project/*.lib
+Project/*.exp
+
+Project/plots/*.txt
+Project/plots/*.png
