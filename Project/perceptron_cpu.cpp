@@ -2,6 +2,7 @@
 #include <fstream>
 #include <vector>
 #include <random>
+#include <chrono>
 #include <stdlib.h>
 #include <math.h>
 #include "cifar10_reader.hpp"
@@ -47,7 +48,7 @@ void normalize(double *a, const int N) {
 void initialize(double *w, double *b, const double mu, const double sigma) {
     // @param w: of size (3072, 10), that is (DIM_INPUT, DIM_OUTPUT)
     // @param b: of size (10, 1), that is (DIM_OUTPUT, 1)
-    default_random_engine generator;
+    default_random_engine generator(time(0));
     normal_distribution<double> distribution(mu, sigma);
 
     // initialize w
@@ -312,7 +313,11 @@ int main() {
     double *b = (double *)calloc(DIM_OUTPUT, sizeof(double));
     initialize(w, b, mu, sigma);
 
+    auto start = chrono::high_resolution_clock::now();
     batchGradientDescent(data.training_images, data.training_labels, w, b, data.validation_images, data.validation_labels);
+    auto stop = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start); 
+    cout << "Training takes " << duration.count() << endl; 
 
     // accuracy on test set
     double accuracy = computeAccuracy(data.test_images, data.test_labels, w, b, NUM_TEST);

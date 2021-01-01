@@ -10,7 +10,10 @@ cpu:
 	./perceptron_cpu.out
 
 plot_cpu:
-	python plots/plot.py ./plots/perceptron_cpu.txt ./plots/perceptron_cpu.png
+	python plots/plot.py cpu
 
 plot_gpu:
-	python plots/plot.py ./plots/perceptron_gpu.txt ./plots/perceptron_gpu.png
+	python plots/plot.py gpu
+
+performance:
+	python plots/performance.py

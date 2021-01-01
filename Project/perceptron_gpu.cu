@@ -2,6 +2,7 @@
 #include <fstream>
 #include <vector>
 #include <random>
+#include <chrono>
 #include <stdlib.h>
 #include <math.h>
 #include "cifar10_reader.hpp"
@@ -53,7 +54,7 @@ void normalize(double *a, const int N) {
 void initialize(double *w, double *b, const double mu, const double sigma) {
     // @param w: of size (3072, 10), that is (DIM_INPUT, DIM_OUTPUT)
     // @param b: of size (10, 1), that is (DIM_OUTPUT, 1)
-    default_random_engine generator;
+    default_random_engine generator(time(0));
     normal_distribution<double> distribution(mu, sigma);
 
     // initialize w
@@ -234,7 +235,7 @@ __global__ void __gpu_computeCost(double *x, int *y, double *w, double *b, const
     }
     __syncthreads();
     
-    for (int i = index_y; i < N; i += stride_y) {
+    for (int i = index_y; i < DIM_INPUT; i += stride_y) {
         for (int j = index_x; j < DIM_OUTPUT; j += stride_x) 
             atomicAdd(&w2, pow(w[i * DIM_OUTPUT + j], 2));
     }
@@ -333,7 +334,7 @@ __global__ void computeGradient(double *x, int *y, double *w, double *b, const i
     }
 }
 
-__global__ void updateGradient(double *w, double *b, Gradient *gradient) {
+__global__ void updateWeight(double *w, double *b, Gradient *gradient) {
     const int index_x = blockIdx.x * blockDim.x + threadIdx.x;
     const int index_y = blockIdx.y * blockDim.y + threadIdx.y;
     const int stride_x = blockDim.x * gridDim.x;
@@ -381,7 +382,7 @@ void batchGradientDescent(double *x, int *y, double *w, double *b, double *x_t, 
 
             // compute and update gradient
             computeGradient<<<NUM_BLOCK, NUM_THREAD>>>(batch_x, batch_y, w, b, BATCH_SIZE, gradient, p);
-            updateGradient<<<NUM_BLOCK, NUM_THREAD>>>(w, b, gradient);
+            updateWeight<<<NUM_BLOCK, NUM_THREAD>>>(w, b, gradient);
             cudaDeviceSynchronize();
 
             // free memory
@@ -482,7 +483,11 @@ int main() {
     cudaMallocManaged(&b, DIM_OUTPUT * sizeof(double));
     initialize(w, b, mu, sigma);
 
+    auto start = chrono::high_resolution_clock::now();
     batchGradientDescent(data.training_images, data.training_labels, w, b, data.validation_images, data.validation_labels);
+    auto stop = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start); 
+    cout << "Training takes " << duration.count() << endl; 
 
     // accuracy on test set
     double accuracy = computeAccuracy(data.test_images, data.test_labels, w, b, NUM_TEST);

@@ -5,5 +5,5 @@ Project/*.out
 Project/*.lib
 Project/*.exp
 
-Project/plots/*.txt
-Project/plots/*.png
+# Project/plots/*.txt
+# Project/plots/*.png
